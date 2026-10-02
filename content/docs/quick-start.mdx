@@ -1,0 +1,178 @@
+---
+title: Quick Start
+description: Run BookReplay with Docker Compose and import your first Kindle highlights.
+---
+
+This guide takes you from an empty directory to a running BookReplay instance with your Kindle highlights in it. Each instance has one owner account, which you create during setup.
+
+## Before you start
+
+You need:
+
+- A **Linux x86-64** (`linux/amd64`) host. ARM64, including Raspberry Pi and native Apple Silicon, is not yet supported or tested.
+- **Docker Engine** with **Docker Compose 2.24.4** or newer.
+- `My Clippings.txt` from your Kindle, found in its `documents` folder.
+
+BookReplay runs as one application container next to PostgreSQL 17. Compose starts both.
+
+<Callout type="warn" title="No prebuilt release yet">
+  The first prebuilt image, `ghcr.io/loukag/bookreplay:v0.1.0`, has not been
+  published. Until it is, build from source. Each step below shows both paths.
+</Callout>
+
+## Install
+
+<Steps>
+<Step>
+
+### Get the files
+
+<Tabs items={['Build from source', 'Published release']}>
+<Tab value="Build from source">
+
+Clone the repository and run every later command from inside it:
+
+```sh
+git clone https://github.com/BookReplay/BookReplay.git
+cd BookReplay
+```
+
+</Tab>
+<Tab value="Published release">
+
+Download `compose.yaml` and `.env.example` from the same release into a dedicated directory, and run every later command from that directory.
+
+</Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Configure the instance
+
+Create your `.env` and restrict it to your user:
+
+```sh
+cp .env.example .env
+chmod 600 .env
+```
+
+Generate two separate secrets by running this command twice:
+
+```sh
+openssl rand -hex 32
+```
+
+Edit `.env` and set:
+
+| Variable | Value |
+| --- | --- |
+| `POSTGRES_PASSWORD` | The first generated value. |
+| `SETUP_SECRET` | The second generated value. Registration is disabled without it. |
+| `BOOKREPLAY_IMAGE` | The published version you chose, or an immutable `image@sha256:…` digest. Not needed when building from source. |
+| `OPEN_LIBRARY_CONTACT_EMAIL` | Optional. Your contact address for Open Library requests. |
+
+Leave the `${POSTGRES_PASSWORD}` reference in `DATABASE_URL` as it is. Compose expands it for you.
+
+</Step>
+<Step>
+
+### Start BookReplay
+
+<Tabs items={['Build from source', 'Published release']}>
+<Tab value="Build from source">
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+docker compose -f compose.yaml -f compose.dev.yaml logs --tail=50 bookreplay
+```
+
+Pass both `-f` arguments to every later `docker compose` command on this stack. The development override also exposes PostgreSQL on `127.0.0.1:5432`.
+
+</Tab>
+<Tab value="Published release">
+
+```sh
+docker compose pull
+docker compose up -d --wait
+docker compose logs --tail=50 bookreplay
+```
+
+</Tab>
+</Tabs>
+
+`up -d --wait` returns once the database migrations have run and the application answers its health check.
+
+</Step>
+<Step>
+
+### Open the app
+
+Go to [http://localhost:2665](http://localhost:2665).
+
+Compose publishes BookReplay only on the host's loopback interface. If it runs on a remote server, open an SSH tunnel from your own computer and use the same URL:
+
+```sh
+ssh -N -L 2665:127.0.0.1:2665 user@your-server
+```
+
+</Step>
+<Step>
+
+### Create the owner account
+
+Register with your setup secret, a name, an email address, and a password of 12 to 128 bytes. Then log in.
+
+Once the account exists, remove `SETUP_SECRET` from `.env` and recreate the application so nobody else can register:
+
+```sh
+docker compose up -d --force-recreate bookreplay
+```
+
+</Step>
+<Step>
+
+### Import your highlights
+
+Open **Import**, select `My Clippings.txt` (up to 16 MiB), and import it. Your highlights appear in the library, grouped by book.
+
+Covers and book details are filled in from Open Library in the background, so they can take a moment to appear. This needs outbound internet access.
+
+You can import the same file again whenever you have new highlights. Only the new ones are added.
+
+</Step>
+<Step>
+
+### Check that your data persists
+
+```sh
+docker compose restart
+```
+
+When the app is back, refresh the library and confirm your highlights are still there.
+
+</Step>
+</Steps>
+
+## Keep your data safe
+
+Your library lives in the Docker volume `bookreplay_postgres_data`. Stopping, restarting, or replacing containers keeps it.
+
+```sh
+docker compose stop   # Stop without removing containers or data.
+docker compose start  # Resume a stopped stack.
+docker compose down   # Remove containers and network; keep the database volume.
+docker compose up -d  # Recreate containers on the same database volume.
+```
+
+<Callout type="error" title="`down -v` deletes your library">
+  `docker compose down -v` removes the database volume and everything in it.
+  Take a backup first.
+</Callout>
+
+Changing `POSTGRES_PASSWORD` in `.env` does not change the password of a database that already exists. Do not delete the volume to fix a credential mismatch.
+
+## Next steps
+
+- **Access from other devices:** put BookReplay behind HTTPS, and set `APP_ORIGIN=https://your-domain` and `SESSION_COOKIE_SECURE=true` before exposing it. See the [HTTPS setup and owner recovery guide](https://github.com/BookReplay/BookReplay/blob/main/deploy/SECURITY.md).
+- **Backups and upgrades:** see the [BookReplay README](https://github.com/BookReplay/BookReplay#readme).
