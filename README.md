@@ -51,4 +51,13 @@ The vinext build and direct calls to its built route handler have been checked f
 
 Vite uses `@tailwindcss/vite` to compile styles. Its PostCSS plugin list is empty to avoid running the existing Next.js PostCSS pipeline twice. The original Next.js build still uses `postcss.config.mjs`.
 
+Cloudflare builds use `@cloudflare/vite-plugin` with the `rsc` environment and its `ssr` child. This generates `dist/server/wrangler.json` with the compiled Worker entry and assets directory, and redirects Wrangler to that generated configuration. Keep this plugin in `vite.config.ts`; the source Wrangler configuration alone is not a deployable build.
+
+Use Node.js 22 or newer for Wrangler. To check the deployment bundle without publishing:
+
+```sh
+npm run build:vinext
+npx wrangler deploy --dry-run
+```
+
 Run `npm audit` with registry access to check dependency vulnerabilities. The migration environment could not reach the npm registry, so the vulnerability audit could not complete. Check browser rendering and search locally before deploying.
