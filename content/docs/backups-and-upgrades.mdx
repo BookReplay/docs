@@ -1,0 +1,78 @@
+---
+title: Backups and upgrades
+description: Back up, restore, and upgrade your self-hosted BookReplay library.
+---
+
+PostgreSQL stores your account, highlights and edits, book matches, review history, import records, and sessions. The default Docker volume is `bookreplay_postgres_data`; overriding the Compose project name changes the volume name. Keep the project name stable when replacing containers.
+
+Preserve `.env` separately as private configuration, and keep your original Kindle clippings file. The application container has no persistent filesystem volume.
+
+The commands below use the source-build configuration from [Quick Start](/docs/quick-start). For a deployment using only `compose.yaml` with a published image, omit `-f compose.yaml -f compose.dev.yaml` throughout.
+
+## Back up
+
+Run this from the deployment directory while PostgreSQL is running:
+
+```sh
+umask 077
+docker compose -f compose.yaml -f compose.dev.yaml exec -T postgres pg_dump -U bookreplay -d bookreplay -Fc > bookreplay-$(date +%F).dump
+```
+
+Check that the command succeeds before relying on the dump. Store a copy off the server and protect it as private library data. Copying the files of a running database volume is not a reliable backup.
+
+## Restore
+
+Restoring replaces database contents. Back up any current library you need to keep first. On a new machine, prepare the Compose files, source checkout if building locally, and `.env`. Use PostgreSQL 17 and an application version at least as new as the version that created the backup.
+
+Replace `bookreplay-2026-10-02.dump` with your backup filename:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --wait postgres
+docker compose -f compose.yaml -f compose.dev.yaml stop bookreplay
+docker compose -f compose.yaml -f compose.dev.yaml exec -T postgres pg_restore -U bookreplay -d bookreplay --clean --if-exists --exit-on-error < bookreplay-2026-10-02.dump
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+```
+
+Confirm that the restore command succeeds before starting the application. Sign in and check your books, edited highlights, and review progress. A restore into a separate instance is a useful way to verify your backup.
+
+Backups include sessions that were valid when the dump was taken. To sign all browsers out after a restore:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml exec postgres psql -U bookreplay -d bookreplay -c 'TRUNCATE tower_sessions.session'
+```
+
+## Upgrade
+
+1. Read the target version's release notes and take a database backup. Keep the previous application version and configuration available for recovery.
+2. For a source build, check out the intended version in your BookReplay source repository, then rebuild:
+
+   ```sh
+   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+   ```
+
+   For a published-image deployment, set `BOOKREPLAY_IMAGE` to the selected version or digest in `.env`, then run:
+
+   ```sh
+   docker compose pull
+   docker compose up -d --wait
+   ```
+
+3. Check container health and open your library to verify the upgrade.
+
+Database migrations run automatically at startup and are not reversible. To roll back after a migration, restore the pre-upgrade backup and run the previous application version. Changes made after that backup will be lost.
+
+Upgrading to a new PostgreSQL major version is a separate operation requiring a dump and restore into a database initialized with the new version.
+
+## Stop or replace containers
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml stop
+docker compose -f compose.yaml -f compose.dev.yaml start
+```
+
+Stopping or restarting containers preserves the database. `docker compose down` also preserves the named volume, allowing containers to be recreated against the same data.
+
+<Callout type="error" title="Removing the volume deletes your library">
+  `docker compose down -v` removes the database volume. Do not use it for ordinary
+  shutdowns, upgrades, or troubleshooting database credentials.
+</Callout>

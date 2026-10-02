@@ -1,0 +1,75 @@
+---
+title: Configuration
+description: Configure your self-hosted BookReplay instance, metadata sources, and browser access.
+---
+
+Docker Compose reads `.env` beside `compose.yaml`. The BookReplay binary does not load this file itself. Keep `.env` private with `chmod 600 .env`.
+
+After editing application settings, recreate the application container. For a source-built stack:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate bookreplay
+```
+
+For a deployment using a published image and only `compose.yaml`, omit `-f compose.yaml -f compose.dev.yaml`.
+
+## Database and setup
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_PASSWORD` | Required. Password used to initialize PostgreSQL. Generate it with `openssl rand -hex 32`. |
+| `DATABASE_URL` | Required. The example uses `postgresql://bookreplay:${POSTGRES_PASSWORD}@postgres:5432/bookreplay`; Compose expands the password reference. |
+| `SETUP_SECRET` | Separate random secret, 32–128 bytes, needed to register the first owner. Empty disables setup. Remove it after registration and recreate the app. |
+| `BOOKREPLAY_IMAGE` | Published version tag or immutable digest for an image deployment. The source-build override uses `localhost/bookreplay:dev` instead. |
+
+Changing `POSTGRES_PASSWORD` does not update an existing database's password. Change the PostgreSQL role password and connection URL together; do not delete the volume to resolve a mismatch.
+
+The supplied installation creates one owner account and runs one application instance. Registration stays closed once an account exists.
+
+## Book metadata and privacy
+
+See [Book enrichment](/docs/book-enrichment) for provider setup, Google Books API-key instructions, and correcting book matches.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `METADATA_ENRICHMENT` | `true` | Enables background book lookups and **Identify book**. Accepts exactly `true` or `false`. |
+| `OPEN_LIBRARY_CONTACT_EMAIL` | Empty | Optional contact address included in metadata requests' User-Agent. |
+| `GOOGLE_BOOKS_API_KEY` | Empty | Optional server-side key that enables Google Books as another metadata source. |
+
+Open Library searches use the imported book title and author. BookReplay selects the best available match automatically; use **Identify book** when it picks the wrong edition or title.
+
+With a Google Books API key configured, automatic matching also searches Google Books when Open Library fails, has an imperfect title match, or lacks a cover or authors. Manual identification searches both enabled sources. Adding a key does not automatically reprocess books whose matching has already completed.
+
+Metadata requests send book titles and authors to the enabled providers. Highlight text is not sent to those providers. Your browser loads covers directly from Open Library, Archive.org, and Google Books, exposing its IP address to the relevant image host.
+
+Set `METADATA_ENRICHMENT=false` to stop background lookups and disable **Identify book**. New imports keep their Kindle titles without fetched covers. Pending books can be processed when enrichment is enabled again. Previously stored covers can still load in your browser.
+
+## Browser access
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APP_ORIGIN` | `http://localhost:2665` | Exact browser origin, including scheme and any non-default port, without a path or trailing slash. |
+| `SESSION_COOKIE_SECURE` | `false` | Use `false` for localhost or SSH-tunnel HTTP, `true` for HTTPS. Accepts exactly `true` or `false`. |
+| `CLIENT_IP_HEADER` | Empty | Client-address header supplied by a trusted reverse proxy, used for authentication rate limits. |
+
+The supplied Compose configuration binds the application to `127.0.0.1:2665`. Use an SSH tunnel for private remote access, or follow the [HTTPS deployment guide](https://github.com/BookReplay/BookReplay/blob/main/deploy/SECURITY.md#https-with-caddy-on-the-host) for access through a domain. Remote browser access requires HTTPS and secure cookies.
+
+Only configure `CLIENT_IP_HEADER` when the backend is reachable through your trusted proxy alone. The supplied Caddy configuration uses `X-Forwarded-For`.
+
+## Logs and listening address
+
+`RUST_LOG` defaults to `bookreplay_api=info`. For example, `warn,bookreplay_api=info,bookreplay_openlibrary=info` enables informational events for both application crates. Dependency tracing is suppressed to protect request and session data.
+
+`BIND_ADDR` defaults to `127.0.0.1:2665` for the standalone binary. The container image sets `0.0.0.0:2665`, with Compose restricting the published host port to loopback. The supplied Compose file does not forward a `.env` override for this variable.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Registration is disabled | Set a valid `SETUP_SECRET` and recreate the app before registering the first owner. An existing account keeps registration closed. |
+| Writes return HTTP 403 | Match the browser URL to `APP_ORIGIN`, then recreate the app if the setting changed. |
+| Login does not persist over HTTP | Use `SESSION_COOKIE_SECURE=false` for localhost or SSH-tunnel HTTP. Use HTTPS for remote browser access. |
+| Authentication returns HTTP 429 | Wait before retrying; authentication is rate limited. Behind a proxy, verify the trusted client-address header configuration. |
+| Import returns HTTP 413 | Split the file into pieces below 16 MiB at complete clipping boundaries. |
+| Covers are missing | Check enrichment settings and outbound provider access. Try **Identify book** if automatic matching failed. |
+| The container is unhealthy | Check `docker compose ps` and application logs using the same Compose files used to start the stack. The health check requires database access. |

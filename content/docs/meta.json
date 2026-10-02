@@ -1,4 +1,4 @@
 {
   "title": "BookReplay",
-  "pages": ["index", "quick-start"]
+  "pages": ["index", "quick-start", "using-bookreplay", "book-enrichment", "configuration", "backups-and-upgrades"]
 }

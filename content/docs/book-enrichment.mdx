@@ -1,0 +1,97 @@
+---
+title: Book enrichment
+description: Add covers and book details with Open Library and Google Books, and correct matches manually.
+---
+
+BookReplay enriches imported books with covers, titles, authors, and available publication details. Matching runs in the background after import, so your highlights are available before all book details appear.
+
+## Metadata sources
+
+| Provider | Setup | When BookReplay uses it |
+| --- | --- | --- |
+| **Open Library** | Enabled by default; no API key required. | The first source for automatic matching, and available in **Identify book**. |
+| **Google Books** | Optional; requires `GOOGLE_BOOKS_API_KEY`. | Supplements automatic matching when Open Library fails or returns an incomplete or imperfect match. Also searched during manual identification. |
+
+Automatic matching starts with the Kindle title and author, then tries simpler title searches when needed. Titles are searched in their original language. Results are ranked by title wording, author similarity, and available metadata; Open Library wins ties.
+
+Google Books is searched when Open Library fails, has an imperfect title match, or lacks a cover or authors. A complete, exact Open Library match does not need a Google lookup. Details from different results are combined only when they share an ISBN. Missing fields preserve existing values, and Google edition dates are not treated as first-publication years.
+
+## Use Open Library
+
+The default configuration is enough to enable Open Library. You can optionally provide a contact email for its request User-Agent:
+
+```dotenv
+METADATA_ENRICHMENT=true
+OPEN_LIBRARY_CONTACT_EMAIL=you@example.com
+```
+
+Set these values in `.env` beside `compose.yaml`. The email is optional; leave it empty if you do not want to provide one. The server needs outbound internet access for lookups.
+
+## Enable Google Books
+
+1. Select or create a project in the [Google API Console](https://console.cloud.google.com/).
+2. Enable the **Books API** for that project.
+3. Open **APIs & Services → Credentials**, select **Create credentials → API key**, and copy the key. See [Google's API-key instructions](https://developers.google.com/books/docs/v1/using#APIKey) for details.
+4. Add the key to your BookReplay `.env`:
+
+   ```dotenv
+   METADATA_ENRICHMENT=true
+   GOOGLE_BOOKS_API_KEY=YOUR_GOOGLE_BOOKS_API_KEY
+   ```
+
+5. Recreate the application container to apply the settings.
+
+BookReplay sends the key from the server; it is not exposed as browser configuration. It searches public book metadata and does not require readers to connect a Google account.
+
+For a source-built stack, apply configuration changes with:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate bookreplay
+```
+
+For a published-image installation using only `compose.yaml`:
+
+```sh
+docker compose up -d --force-recreate bookreplay
+```
+
+New and pending imports use the enabled providers. Adding a Google key does **not** automatically reprocess books whose matching has already completed. Use **Identify book** to search again for those books.
+
+To return to Open Library alone, clear `GOOGLE_BOOKS_API_KEY` and recreate the app. Existing book metadata remains stored.
+
+## Correct a book match
+
+1. Open **Books** and open the book's menu.
+2. Choose **Identify book**. BookReplay searches using the current title.
+3. Adjust the search text and select **Search** if the correct book is missing.
+4. Compare the title, authors, and cover. Results are labeled **Open Library** or **Google Books** so you can see their source.
+5. Select **Identify** beside the desired result to save the match.
+
+Manual searches query both providers when a Google key is configured. Identifying a book updates its metadata; your highlight text stays unchanged.
+
+## Privacy and disabling enrichment
+
+Metadata lookups send book titles and authors to Open Library and, when enabled, Google Books. Highlight text is not sent to either provider. Your browser loads cover images directly from Open Library, Archive.org, and Google Books, which reveals its IP address to those image hosts.
+
+To stop lookups, set:
+
+```dotenv
+METADATA_ENRICHMENT=false
+```
+
+Recreate the application container after changing the value. This stops background enrichment and disables **Identify book**. New books keep their Kindle title without fetched covers. Queued imports can be enriched after you enable the setting again.
+
+Previously stored metadata remains available, and existing covers can still load from their external image hosts. Disabling enrichment does not remove those covers.
+
+## Missing covers or incorrect details
+
+| Problem | What to try |
+| --- | --- |
+| A new book has no cover yet | Allow time for background matching and check that the server can reach the providers. Some records have no cover. |
+| The wrong title, author, or edition appears | Use **Identify book** and choose the correct result. |
+| Google results do not appear | Check that the Books API is enabled, the key is set, and the application container was recreated. A search may also have no Google matches. |
+| Old books did not change after adding Google Books | Search for them manually with **Identify book**; completed books are not automatically requeued. |
+| Manual search says lookup is turned off | Set `METADATA_ENRICHMENT=true` and recreate the app. |
+| Matching is delayed during a provider outage | BookReplay backs off and retries transient failures. Repeated failures eventually stop automatic retries; use **Identify book** afterward. |
+
+For other instance settings, see [Configuration](/docs/configuration).

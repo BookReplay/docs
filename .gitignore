@@ -9,6 +9,9 @@
 /.next/
 /out/
 /build
+/dist/
+/.vinext/
+/.wrangler/
 *.tsbuildinfo
 
 # misc

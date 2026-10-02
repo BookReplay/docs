@@ -1,0 +1,52 @@
+---
+title: Using BookReplay
+description: Import Kindle clippings, browse and edit highlights, and build a daily review habit.
+---
+
+After [setting up your instance](/docs/quick-start), log in and use **Today**, **Review**, **Books**, **Progress**, and **Settings** to move around BookReplay.
+
+## Import your Kindle clippings
+
+1. Copy `documents/My Clippings.txt` from your Kindle to your computer.
+2. Open **Import**, choose the non-empty `.txt` file, and select **Import clippings**. The maximum upload size is 16 MiB (16,777,216 bytes).
+3. Wait for the import to finish. BookReplay shows a short highlight preview, then the number imported and any duplicates skipped.
+4. Choose **Start revision** to review, or return to **Books** to browse your library.
+
+You can import the same file again after adding more highlights on your Kindle. Existing entries are skipped, including entries whose text you have edited in BookReplay. Reimporting the original file does not overwrite those edits.
+
+The processing messages show that the import is underway; they are not a measured percentage of server progress. If an import fails, the selected file remains available so you can retry.
+
+For files larger than 16 MiB, split the export between complete entries at `==========` separator lines. Keep each entry's book title, metadata line, and text together. If an import adds nothing, check whether the entries are already in your library and whether the file has the Kindle clippings structure.
+
+## Browse and edit highlights
+
+Open **Books** and select a book to read its highlights. Choose **Edit** beside a highlight, change its text, and select **Save**. Highlight text cannot be empty. Edits change your BookReplay library; they do not change the original Kindle file.
+
+Book covers and details are matched in the background. To correct a match, open the book's menu on the bookshelf and choose **Identify book**, search, and select the matching result. This requires metadata enrichment to be enabled. See [Book enrichment](/docs/book-enrichment) for Open Library and Google Books setup.
+
+## Review highlights
+
+Open **Review** to revisit highlights that are due or have never been reviewed. Read each highlight and choose when you want to see it again:
+
+| Choice | After the first review |
+| --- | --- |
+| **Soon** | Returns in 3 days. |
+| **Later** | Returns in 14 days. |
+| **Much later** | Returns in 60 days. |
+| **Archive** | Stops future reviews and keeps the highlight in your library. |
+
+Intervals grow with the number of previous reviews. For example, choosing **Later** repeatedly schedules 14, 30, 60, then 120 days. After each choice, BookReplay confirms the next interval or that the highlight was archived.
+
+When no highlights are ready, the review page says you are caught up. You can still browse your books while you wait for scheduled highlights to return.
+
+## Daily progress and streaks
+
+Review five highlights in a day to reach the daily goal. Archiving a highlight during review also counts. At the goal, choose **Done for now** or **Revisit a few more** if the session has highlights remaining.
+
+Open **Progress** to see today's count and your streak. Reach the goal on consecutive days to grow the streak; missing a day breaks it. Daily progress resets at **midnight UTC**, which may differ from midnight in your local time zone.
+
+## Account settings
+
+Open **Settings** to sign out or choose **Change password**. Enter your current password and the new password twice. Passwords must be 12–128 UTF-8 bytes; some characters use more than one byte.
+
+Changing your password invalidates existing sessions, including the current browser, so sign in again afterward. If you cannot sign in, the server operator can use the [owner recovery instructions](https://github.com/BookReplay/BookReplay/blob/main/deploy/SECURITY.md#operator-only-recovery). BookReplay has no email password-reset flow.

@@ -15,9 +15,10 @@ You need:
 
 BookReplay runs as one application container next to PostgreSQL 17. Compose starts both.
 
-<Callout type="warn" title="No prebuilt release yet">
-  The first prebuilt image, `ghcr.io/loukag/bookreplay:v0.1.0`, has not been
-  published. Until it is, build from source. Each step below shows both paths.
+<Callout type="warn" title="Build from source">
+  The checked-in deployment files describe `ghcr.io/loukag/bookreplay:v0.1.0`
+  as a planned first release. Use the source-build path unless you have confirmed
+  that your selected release image is published and accessible.
 </Callout>
 
 ## Install
@@ -123,11 +124,13 @@ ssh -N -L 2665:127.0.0.1:2665 user@your-server
 
 Register with your setup secret, a name, an email address, and a password of 12 to 128 bytes. Then log in.
 
-Once the account exists, remove `SETUP_SECRET` from `.env` and recreate the application so nobody else can register:
+Registration stays closed once an owner exists. Remove `SETUP_SECRET` from `.env` and recreate the application to remove the secret from the running container. For a source-built stack:
 
 ```sh
-docker compose up -d --force-recreate bookreplay
+docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate bookreplay
 ```
+
+For a published-image installation, omit both `-f` arguments.
 
 </Step>
 <Step>
@@ -138,7 +141,7 @@ Open **Import**, select `My Clippings.txt` (up to 16 MiB), and import it. Your h
 
 Covers and book details are filled in from Open Library in the background, so they can take a moment to appear. This needs outbound internet access.
 
-You can import the same file again whenever you have new highlights. Only the new ones are added.
+You can import the same file again whenever you have new highlights. Only the new ones are added, and edits made in BookReplay are preserved. The result shows the number imported and any duplicates skipped. Choose **Start revision** to begin reviewing.
 
 </Step>
 <Step>
@@ -146,24 +149,28 @@ You can import the same file again whenever you have new highlights. Only the ne
 ### Check that your data persists
 
 ```sh
-docker compose restart
+docker compose -f compose.yaml -f compose.dev.yaml restart
 ```
 
-When the app is back, refresh the library and confirm your highlights are still there.
+For a published-image installation, use `docker compose restart`. When the app is back, refresh the library and confirm your highlights are still there.
 
 </Step>
 </Steps>
 
 ## Keep your data safe
 
-Your library lives in the Docker volume `bookreplay_postgres_data`. Stopping, restarting, or replacing containers keeps it.
+Your library lives in the Docker volume `bookreplay_postgres_data` with the default Compose project name. Stopping, restarting, or replacing containers keeps it. Keep the project name stable to reuse the same volume.
+
+For a source-built stack:
 
 ```sh
-docker compose stop   # Stop without removing containers or data.
-docker compose start  # Resume a stopped stack.
-docker compose down   # Remove containers and network; keep the database volume.
-docker compose up -d  # Recreate containers on the same database volume.
+docker compose -f compose.yaml -f compose.dev.yaml stop
+docker compose -f compose.yaml -f compose.dev.yaml start
+docker compose -f compose.yaml -f compose.dev.yaml down
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
 ```
+
+These commands stop, resume, remove, and recreate containers respectively, while keeping the database volume. Omit both `-f` arguments and `--build` when using a published image.
 
 <Callout type="error" title="`down -v` deletes your library">
   `docker compose down -v` removes the database volume and everything in it.
@@ -174,5 +181,7 @@ Changing `POSTGRES_PASSWORD` in `.env` does not change the password of a databas
 
 ## Next steps
 
-- **Access from other devices:** put BookReplay behind HTTPS, and set `APP_ORIGIN=https://your-domain` and `SESSION_COOKIE_SECURE=true` before exposing it. See the [HTTPS setup and owner recovery guide](https://github.com/BookReplay/BookReplay/blob/main/deploy/SECURITY.md).
-- **Backups and upgrades:** see the [BookReplay README](https://github.com/BookReplay/BookReplay#readme).
+- **Use your library:** learn about [editing, book identification, reviews, and daily progress](/docs/using-bookreplay).
+- **Configure the instance:** see [metadata, privacy, and browser access settings](/docs/configuration).
+- **Access from other devices:** follow the [HTTPS setup and owner recovery guide](https://github.com/BookReplay/BookReplay/blob/main/deploy/SECURITY.md). The supplied operator guide advises against using the development Compose override for public deployments.
+- **Keep your library safe:** follow [Backups and upgrades](/docs/backups-and-upgrades).
